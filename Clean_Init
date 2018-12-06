@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[19]:
+
+
+import os
+import pandas as pd
+import numpy as np
+import docx
+import re 
+import gensim
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+import string
+
+
+
+### Point to Transcript Directory ### 
+os.chdir('/Users/cecortez/Data Analysis')
+
+
+
+
+### pull text from documents Function ### 
+def getText(filename):
+    doc = docx.Document(filename)
+    fullText = []
+    for para in doc.paragraphs:
+        fullText.append(para.text)
+    return '\n'.join(fullText)
+###Pull testing text ### 
+rawtext = getText('ID62.docx')
+
+###Get rid of punctuation### 
+translator=str.maketrans('','',string.punctuation)
+rawtext=rawtext.translate(translator)
+
+###Split lines/Grab data from Participant responses ### 
+split_string = rawtext.splitlines()
+split_string
+responses=[]
+for word in split_string:
+    if word.startswith('62'):
+        responses.append(word)
+        
+###Get rid of "62:" in the strings ### 
+response2 = []
+for line in responses:
+    line = line.replace('62','')
+    response2.append(line)
+
+### Tokenize Text ### 
+tokenized_list = []
+def tokenize(text):
+    for w in text:
+        tokentry = word_tokenize(w)
+        tokenized_list.append(tokentry)
+tokenize(response2)
+
+### Drop Stopwords ### 
+stop_words = set(stopwords.words('english')) 
+filtered_sentence = []
+def remove_stop(text):
+    i=0
+    for w in text:
+        filtered_words = []
+        for t in w:
+            if t not in stop_words:
+                filtered_words.append(t)
+            T = TaggedDocument(filtered_words,str(i))
+        i=i+1
+        filtered_sentence.append(T)
+remove_stop(tokenized_list)
+#tagged_data = [TaggedDocument(words=filtered_sentence, tags=[str(i)]) for i, _d in enumerate(filtered_sentence)]
+
+
+
+
+#tagged_data
+#filtered_sentence
+
+
+#####################################################
+
+### Build doc2vec model ### 
+max_epochs = 100
+vec_size= 20
+alpha = 0.025
+model = gensim.models.Doc2Vec(vector_size=vec_size,window=10,min_count=1,workers=11,alpha=alpha,min_alpha=0.00025,dm=1)
+
+### Build Vocab ### 
+model.build_vocab(filtered_sentence)
+
+for epoch in range(max_epochs):
+    print ('iteration {0}'.format(epoch))
+    model.train(filtered_sentence,total_examples=model.corpus_count,epochs=model.iter)
+    ### Decrease the learning rate ### 
+    model.alpha -=0.0002
+    ### Fix the learning Rate, no decay###
+    model.min_alpha = model.alpha
+    
+model.save("d2v.model")
+print('Model Saved')
+
+
+
+#del model 
+
+
+
+### Testing Model Functions ### 
+sims = model.most_similar('talk')
+#print(sims)
